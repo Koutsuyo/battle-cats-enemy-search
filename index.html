@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>にゃんこ大戦争 敵出現ステージ検索</title>
+    <style>
+        :root {
+            --primary-color: #1a73e8;
+            --background-color: #f8f9fa;
+            --container-bg: #ffffff;
+            --text-color: #3c4043;
+            --border-color: #dadce0;
+        }
+        *, *::before, *::after { box-sizing: border-box; }
+        body {
+            margin: 0;
+            padding: 1rem;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: var(--background-color);
+            color: var(--text-color);
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 1.25rem;
+            background: var(--container-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+        }
+        h1 {
+            margin: 0 0 1.5rem;
+            padding-bottom: 0.75rem;
+            font-size: 1.8em;
+            text-align: center;
+            color: var(--primary-color);
+            border-bottom: 2px solid var(--primary-color);
+        }
+        .control-group {
+            padding: 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            margin-bottom: 1.5rem;
+        }
+        .control-group > label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 0.75rem;
+            color: var(--primary-color);
+        }
+        #chapter-radio-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+        }
+        .chapter-radio-item input { display: none; }
+        .chapter-radio-item input:checked + label {
+            background: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+        .chapter-radio-item label {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.5rem 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: 1rem;
+            background: var(--background-color);
+            cursor: pointer;
+            transition: background-color 0.3s, color 0.3s;
+            white-space: nowrap;
+        }
+        .enemy-selectors {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 1rem;
+        }
+        .button-container { text-align: center; }
+        button {
+            padding: 0.75rem 2rem;
+            font-size: 1rem;
+            font-weight: bold;
+            color: #fff;
+            background: var(--primary-color);
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            width: 100%;
+            max-width: 400px;
+        }
+        button:hover { background-color: #1b66c9; }
+        .autocomplete { position: relative; }
+        .autocomplete input {
+            width: 100%;
+            padding: 0.625rem;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+        }
+        .autocomplete-items {
+            position: absolute;
+            z-index: 99;
+            left: 0; right: 0;
+            max-height: 200px;
+            overflow-y: auto;
+            background: white;
+            border: 1px solid var(--border-color);
+        }
+        .autocomplete-items div {
+            padding: 0.625rem;
+            cursor: pointer;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .autocomplete-items div:last-child { border-bottom: none; }
+        .autocomplete-active { background-color: #e8f0fe !important; }
+
+        .label-long { display: inline; }
+        .label-short { display: none; }
+
+        .result-section {
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            margin-top: 1.25rem;
+        }
+        .result-header {
+            padding: 0.75rem;
+            font-weight: bold;
+            background: #f1f3f4;
+            border-radius: 8px 8px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .collapsible .result-header { cursor: pointer; }
+        .collapsible .result-header::after {
+            content: '▼';
+            font-size: 0.8em;
+            transition: transform 0.3s;
+        }
+        .collapsible.open > .result-header::after { transform: rotate(180deg); }
+        .result-content { border-top: 1px solid var(--border-color); }
+        .collapsible .result-content { display: none; }
+        .collapsible.open > .result-content { display: block; }
+
+        .stage-list-item {
+            border: 1px solid #eee;
+            border-radius: 5px;
+            margin-bottom: 5px;
+            transition: background-color 0.2s;
+            cursor: pointer;
+        }
+        .stage-list-item.expanded > .main-stage { background: #e8f0fe; }
+        .main-stage { padding: 0.625rem; }
+        .main-stage:hover { background-color: #f5f5f5; }
+        .stage-info {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            align-items: center;
+            gap: 0.625rem;
+        }
+        .stage-name { font-weight: 500; }
+        .stage-stamina {
+            font-weight: bold;
+            color: var(--primary-color);
+            white-space: nowrap;
+        }
+        .stage-enemies {
+            font-size: 0.8em;
+            color: #5f6368;
+            margin-top: 4px;
+        }
+        .stage-enemies span {
+            display: inline-block;
+            background: #e8f0fe;
+            color: #1967d2;
+            padding: 2px 6px;
+            border-radius: 10px;
+            margin-right: 4px;
+        }
+        .surrounding-stage {
+            padding: 0.5rem 0.625rem 0.5rem 1.875rem;
+            color: gray;
+            background: #fafafa;
+            font-size: 0.9em;
+            border-top: 1px solid #eee;
+        }
+        @media (max-width: 600px) {
+            .label-long { display: none; }
+            .label-short { display: inline; }
+            h1 { font-size: 1.5em; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>にゃんこ大戦争 敵出現ステージ検索</h1>
+        <div class="control-group">
+            <label>検索対象の章</label>
+            <div id="chapter-radio-container"></div>
+        </div>
+        <div class="control-group">
+            <label>敵キャラクター</label>
+            <div class="enemy-selectors">
+                <div class="autocomplete"><input id="enemy1-input" type="text" placeholder="敵1" autocomplete="off"></div>
+                <div class="autocomplete"><input id="enemy2-input" type="text" placeholder="敵2" autocomplete="off"></div>
+                <div class="autocomplete"><input id="enemy3-input" type="text" placeholder="敵3" autocomplete="off"></div>
+            </div>
+        </div>
+        <div class="button-container">
+            <button id="search-button">検索</button>
+        </div>
+        <div id="results-container">
+            <p>章と敵を選択・入力し、検索ボタンを押してください。</p>
+        </div>
+    </div>
+
+<script>
+const ENEMY_DATA = [{"id":"002","name":"わんこ","hiragana":"わんこ","stages":["BCDEFGHIJKLMNOPQRSUVZbcdjklmnoqrs","BCDEFGHIJKLMNOPQRSUVZbcdjklmnoqrs","BCDEFGHIJKLMNOPQRSUVZbcdjklmnoqrs","BCFHJLMNPRSTWXbcgklnrt","BCFJLMNPRSWXbcgknrt","BCFJPWXbgnrt","L","L","L","ABADAFAGAHAIBBBCBDBEBFBGBHBICBCCCECFDBDDDEDFDGDHECEDEEEFFBFEFFFHGBGGHDHEHFHGHIICIEIFIGJGKBKCKDKEKFKGKHKILBLCLELFMBMDMEMFMGMHNCNDNENFOBOEOFPBPEPFPHPIQEQFQGQIRCRDSCSFSGTETGVDXBYBYHbFdGfGgEgFkDnEpBrDvIwB"],"type":"白"},{"id":"003","name":"にょろ","hiragana":"にょろ","stages":["CDEFGHIJKLMNOPRSUVWZbcdehijklnoqrs","CDEFGHIJKLMNOPRSUVWZbcdehijklnoqrs","CDEFGHIJKLMNOPRSUVWZbcdehijklnoqrs","BCDHLMNSTVWXYacdgkmnru","BCDHLMNSVWXacdgkmnru","BCDMVWXdimnru","CEFLr","CEFLr","ELr","ABADAFAGAHAIBBBCBDBEBFBGBHBICBCCCECFCGDBDDDFDGDHEBECEDEEFBFEFFFHGBGEGGHBHDHEHFHGHIIEIFIGJGKBKCKDKEKFKGKHKILBLCLELFLGMBMDMFMGMHNBNCNDNEOBOEOFPBPEPFPHQBQEQFQGQIRDSFSGTBUBXBYCYGbFeDfGkDnEoBpBrDwB"],"type":"白"},{"id":"004","name":"例のヤツ","hiragana":"れいのやつ","stages":["EFGHIJKLMNOPQRSTUVWXZbcdefghijklmnopqrsvw","EFGHIJKLMNOPQRSTUVWXZbcdefghijklmnopqrsvw","EFGHIJKLMNOPQRSTUVWXZbcdefghijklmnopqrsvw","BCDFGIJLMOPRTUVWYcdhlmopruv","BCDFGIJLMOPRUVWcdhlmpruv","BCDFGIJMOPRUVWcdhilmpruv","CFLRrt","CFLRrt","CLrt","ABACADAEAFAGAHAIBBBCBDBEBFBGBHBICBCCCDCECFCGCHDBDDDEDFDGDHEBECEDEEEGFDFIGCGEGGGHGIHBHDHEHFHGHIIEIFIGIIJGKBKCKDKEKFKGKHKILBLCLDLELFLGLHMBMDMEMFMGMHNBNCNDNENGODPCPDPEPIQBQEQGQIRGSFTDTIUFWCXBYCYGYIZBaDbFbGdGeDfEfGgEiEiFkDkGmDmFpBrDtDwB"],"type":"白"},{"id":"005","name":"カバちゃん","hiragana":"かばちゃん","stages":["HLOPRUVYZcehikltvw","HLOPRUVYZcehikltvw","HLOPRUVYZcehikltv","CEGKPUept","CEGKPUept","CEGKept",,,,"AIBGCBCFDBFFGCGEHBIGIIJBKGLBLFMBOFPCPFQBSGTCdGnErD"],"type":"白"},{"id":"006","name":"ブタヤロウ","hiragana":"ぶたやろう","stages":["KMPRSUVXYcefghiklrtu","KMPRSUVXYcefghiklrtu","KMPRSUVXYcefghiklrtuw","DJQWadflu","DJQWadfu","DJQWadfu","EMVgos","EMgo","Egos","BFCBCECHDFFBFIGIJBKFLBLELHMFOBPBaDmCtG"],"type":"赤"},{"id":"007","name":"ジャッキー・ペン","hiragana":"じゃっきーぺん","stages":["NRSVWYZcehinoqtvw","NRSVWYZcehinoqtvw","NRSVWYZcehinoqtv","DFHKMPYhikot","DFHKMPYhikot","DFHKMYhko","N","N",,"AFBGCBCFCGEDFBFFGGIIJBJEKGLBLFLGNDOBOFPBPFQFXG"],"type":"白"},{"id":"008","name":"ゴリさん","hiragana":"ごりさん","stages":["QTUVWYbcehimnoqtvw","QTUVWYbcehimnoqtv","QTUVWYbcehimnoqtvw","DKQSainps","DKQSainp","DKanp","Xq","q","q","AGAIBCCDCECFDDDGEBFEGEHBHFKCLDLELFMDMGNBOEPEQBaDdBdChF"],"type":"白"},{"id":"009","name":"メェメェ","hiragana":"めぇめぇ","stages":["TUVWZbefhikl","TUVWZbefhikl","TUVWZbefhikl","ELObsv","ELObv","ELObv","DR","D","D","AEBECDCECFDDFEIEIIKELDLELFMDOEPERDSFXDaFhF"],"type":"白"},{"id":"010","name":"ゴマさま","hiragana":"ごまさま","stages":["Xabceghinoqrtv","Xabceghinoqrtv","Xabceghinoqrtvw","FIMVYaefo","FIMVae","FIVYae","EHVYgo","EHVYgo","EYgo","BFCHDCDDDGHCIGJEKFLHMCMDMGPGREUDXCYEaDdDnB"],"type":"赤"},{"id":"011","name":"パオン","hiragana":"ぱおん","stages":["dfkoqtv","dfkoqtv","dfkoqtv","NRV","NRV","NRV",,,,"AHCFDDFFLFMDOFPEQDSFZBfEgE"],"type":"白"},{"id":"012","name":"カ・ンガリュ","hiragana":"かんがりゅ","stages":["jloqtvw","jloqtv","jloqtvw","LPUXg","LPUXg","LXg","Gm","Gm","m","BGGDKGOGPCSGXGaDbBfEgCmGnE"],"type":"白"},{"id":"013","name":"一角くん","hiragana":"いっかくくん","stages":["prv","prvw","prv","INbfl","INbfl","IQflu","EMbgu","EMbg","EMbg","DFFGFIGIHCMFQGUDUFXDXFZCgDkElDpEtC"],"type":"赤"},{"id":"014","name":"クマ先生","hiragana":"くませんせい","stages":["suv","suv","suv","LOTbq","OTbq","Obq",,,,"DHMHPFVBVF"],"type":"白"},{"id":"015","name":"ワニック","hiragana":"わにっく","stages":["abcdefhijklmpr","abcdefhijklmprw","abcdefhijklmprw","EHOSUXaegint","EHOSUXYagint","EMTXYant","DGSf","DGS","DGS","ADBIDCDDDEEBHCIGKIMCMDMENBQCXEYCaDbFkDkGlGmGoBwB"],"type":"白"},{"id":"016","name":"ウサ銀","hiragana":"うさぎん","stages":["gjklru","gjklru","gjklruw","DFINQRUWbfru","DFINQRUWbfr","DFINQUWfr","HJMbg","HMbg","HVbg","CEDFDHJEJGLEMFMHRCUDXBaBaDeDgCiElDnDpB"],"type":"赤"},{"id":"017","name":"リッスントゥミー","hiragana":"りっすんとぅみー","stages":["mnopqsu","mnopqsuw","mnopqsu","EFINQRUWbhor","EFINRUWbhor","EFIRUWbhior","GNPfrt","GNPfrt","GMPfrt","AIBGCIDBDFEFFCFDHHHIIDIHIIKGLIMBMFMINFOCODPDPEQDQEQHQIRBRERGSBTFUBUEUGVBXDYGZGbFbGcEfEfGhFiEkDlEoBpBpG"],"type":"白"},{"id":"018","name":"ブラックマ","hiragana":"ぶらっくま","stages":[,,,,,,,,,"IIRFRGSCVEYDYGZFbGeCgDnCpCvF"],"type":"黒"},{"id":"019","name":"赤羅我王","hiragana":"あからがおう","stages":[,,,"Whl","Whl","hl",,"V","V","EFFDICJFNFODPDRCTBUDVEVGWGYFbCvH"],"type":"赤浮"},{"id":"020","name":"カオル君","hiragana":"かおるくん","stages":["w",,,"h","h","h",,,,"EFNFQFRFTDUCVGWFZGbCiBoGsE"],"type":"浮"},{"id":"024","name":"ガガガガ","hiragana":"がががが","stages":["mu","mu","muw","JScin","JQScin","JSn","OZhu","Zh","h","BDEFFBIDIGJCKDNFOBPBQFRBUBYFaDgGtF"],"type":"浮"},{"id":"025","name":"悪の帝王ニャンダム","hiragana":"あくのていおうにゃんだむ","stages":[,"w",,,,,,,,"GBGISCTEUDVFWCZBbDjBtG"],"type":"赤"},{"id":"026","name":"ぶんぶん先生","hiragana":"ぶんぶんせんせい","stages":[,,"w",,,,,,,"GIJFTGUGWGaDbFfGoEpFvH"],"type":"浮"},{"id":"033","name":"師匠","hiragana":"ししょう","stages":[,,,,,,,,,"BICGDBDGEBECEGFGGCGHHCIFKILGMBMGNBNCNGPDQCSETFVCVGYCeDlGuBvH"],"type":"白"},{"id":"034","name":"ダチョウ同好会","hiragana":"だちょうどうこうかい","stages":[,,,,,,,,,"QERBRGUBVCYDcDdBkDlEoBrGtEuEvH"],"type":"白"},{"id":"035","name":"フルぼっこ","hiragana":"ふるぼっこ","stages":[,,,,,"it",,,,"EGGDHDIIJDNGPEQCQEQISBcFlG"],"type":"白"},{"id":"036","name":"コアラッキョ","hiragana":"こあらっきょ","stages":[,,,,,,,,,"JGOGRDTHVFWFXBZIbDfEiDjCmGqCvH"],"type":"白"},{"id":"037","name":"こぶへい","hiragana":"こぶへい","stages":[,,,,,,,,,"IIJBQGSEVFXEYEeDhFiGlEvBvH"],"type":"白"},{"id":"038","name":"アヒルンルン","hiragana":"あひるんるん","stages":[,,,,,,"u",,,"DEECEEFCGHHEJDMENCNEOCQCQERDXEcDiFuE"],"type":"白"},{"id":"039","name":"まゆげどり","hiragana":"まゆげどり","stages":[,,,,,,,,,"IEJDQDRDSDTFXCdCuE"],"type":"浮"},{"id":"040","name":"イノシャシ","hiragana":"いのしゃし","stages":[,,,,"l","Wl","go","go","Mgos","GEHBHGJEPCPGQBRGSDTHUEVGXGYIZGaIdGiElCsDvH"],"type":"赤"},{"id":"041","name":"ナマルケモルル","hiragana":"なまるけもるる","stages":[,,,,,,,,,"DIEDEGGGHFNDNGPGRFTBVBXGYDaEhCrEuC"],"type":"白"},{"id":"042","name":"ナカイくん","hiragana":"なかいくん","stages":[,,,,,,,,,"HIJDPDQFVFXEZGbBdBlGsGuG"],"type":"白"},{"id":"043","name":"だっふんど","hiragana":"だっふんど","stages":[,,,,,,"B","B",,"CIDGEBEEFHGFGHHHLIMGNBNEPHQIUFVDiFuB"],"type":"白"},{"id":"044","name":"セレブ","hiragana":"せれぶ","stages":[,,,,,"K",,,,"CDCGDCDIEDEGFBFHGHHGLDLGMCNDNGOBPBPHQCQIUFVBVDZHiF"],"type":"白"},{"id":"045","name":"ハイ・エナジー","hiragana":"はいえなじー","stages":[,,,,,,,,,"PIQHRESBUCWBbGhFrB"],"type":"白"},{"id":"046","name":"ダディ","hiragana":"だでぃ","stages":[,,,,,,,,,"QISGTDVDWFYDcFeCjCnEuF"],"type":"白"},{"id":"047","name":"ウルフとウルルン","hiragana":"うるふとうるるん","stages":[,,,,,,,,,"RG"],"type":"白"},{"id":"048","name":"殺意のわんこ","hiragana":"さついのわんこ","stages":[,,,"TZcgjqs","TZcgjqs","HNTXZcgijnqs","IQUYruv","IQUYruv","IUYru","AIBDBHCDCIDEDHDIEFFDGBGGGHHFHHIBICIHJGKDKHLDLIMEMHMINFODOGPDPFPIQHRCSCSETGUCVDWDXBYBZHaCbGdCdEhBiFmEoFrGsCtEuCvIwB"],"type":"黒"},{"id":"049","name":"メタルカバちゃん","hiragana":"めたるかばちゃん","stages":[,,,"OZju","OZj","OZj","KTdlt","Tdt","Tdlt","ACBBBECHDEFEGFGHHEIIKBKELHMERESDTCUFXDeEiCiFmB"],"type":"メ"},{"id":"050","name":"エリザベス2世","hiragana":"えりざべすにせい","stages":[,,,,,,,"s",,"AEBECCDEEDFCGHKELCMENDOCUDiF"],"type":"赤"},{"id":"051","name":"赤井ブン太郎","hiragana":"あかいぶんたろう","stages":[,,,,,,,,,"FIIDJCPCUGXFYFZBbFdCgClDmCtDuC"],"type":"赤浮"},{"id":"052","name":"ブラックブンブン","hiragana":"ぶらっくぶんぶん","stages":[,,,,,,,,,"OGPCSBUGVGWDXGbFeBoE"],"type":"黒浮"},{"id":"053","name":"ブラッゴリ","hiragana":"ぶらっごり","stages":[,,,"ajs","aj","aij","q","q","q","IBIEIHPDRDSBSDSFTEUCWDYHaCbBcFeGhGjDmErGtE"],"type":"黒"},{"id":"054","name":"シャドウボクサー","hiragana":"しゃどうぼくさー","stages":[,,,"gn","gn","Xgns","Um","Um","Um","HEIBIHPCQHRGSBSDSGTDUGWDaCbBhG"],"type":"黒"},{"id":"055","name":"クロサワ監督","hiragana":"くろさわかんとく","stages":[,,,,,,,,,"MIPGRFTEVGXFbDgClFmEtEuDvH"],"type":"黒"},{"id":"056","name":"超メタルカバちゃん","hiragana":"ちょうめたるかばちゃん","stages":[,,,,,,,,,"TCeEiCmB"],"type":"メ"},{"id":"058","name":"メタルサイボーグ","hiragana":"めたるさいぼーぐ","stages":[,,,,,,"t","t",,"OESDXDZCbBiCmBuDvH"],"type":"メ"},{"id":"060","name":"メタルカオル君","hiragana":"めたるかおるくん","stages":[,,,,,,,,,"bCpF"],"type":"メ"},{"id":"061","name":"メタルゴマさま","hiragana":"めたるごまさま","stages":[,,,,,,,,,"RETCiCmBtFuD"],"type":"メ"},{"id":"105","name":"ゴーストわんこ","hiragana":"ごーすとわんこ","stages":[,,,,,,,,,"jG"],"type":"浮"},{"id":"106","name":"ゴーストにょろ","hiragana":"ごーすとにょろ","stages":[,,,,,,,,,"jG"],"type":"浮"},{"id":"107","name":"ゴーストメェメェ","hiragana":"ごーすとめぇめぇ","stages":[,,,,,,,,,"jG"],"type":"浮"},{"id":"115","name":"天使カバちゃん","hiragana":"てんしかばちゃん","stages":[,,,"ejv","ejv","SZejv","WYou","WYou","WYou","SBTCUGWEWGXDdG"],"type":"天"},{"id":"116","name":"天使ガブリエル","hiragana":"てんしがぶりえる","stages":[,,,"Zjv","Zjov","SZgjov","OWoru","OWoru","OWoru","SESFTGTIUFUGVDWEXBYBZHbBbEdGeFgEhDmGoFrBrGsBtGvBvIwB"],"type":"天"},{"id":"117","name":"天使ゴンザレス","hiragana":"てんしごんざれす","stages":[,,,,"o","jo","OWq","OWq","Wq","SFTIWEXGbBdCfBgBoCpDrGtG"],"type":"天"},{"id":"118","name":"天使愛好家","hiragana":"てんしあいこうか","stages":[,,,,,,,,,"pD"],"type":"メ"},{"id":"119","name":"カベわんこ","hiragana":"かべわんこ","stages":[,,,,,,,,,"TETHUCVFWBWGXFZFcEmDoGpFuF"],"type":"白"},{"id":"120","name":"赤毛のにょろ","hiragana":"あかげのにょろ","stages":[,,,,"elu","IMNUaelu","MVdgru","MVdgru","Cdgru","TBTHTIUDUGXCYHaIeDeGgGhCmCpEtCwB"],"type":"赤"},{"id":"121","name":"マンボーグ鈴木","hiragana":"まんぼーぐすずき","stages":[,,,,,,,,,"TIUEWEYHbEbGdDhDjFpDuFvE"],"type":"天"},{"id":"125","name":"ド鳩・サブ・レー","hiragana":"どばとさぶれー","stages":[,,,,,,,,,"UBUFVFWFYFYHbEdFfEjCnGuEvG"],"type":"浮"},{"id":"126","name":"ブラッコ","hiragana":"ぶらっこ","stages":[,,,,"js","js",,,,"UCUFVFVGWDaCdCeGkFmEtEuC"],"type":"黒"},{"id":"127","name":"天使スレイプニール","hiragana":"てんしすれいぷにーる","stages":[,,,,,,,,,"UFVFWEXDdGgCpDpG"],"type":"天"},{"id":"148","name":"はぐれたヤツ","hiragana":"はぐれたやつ","stages":[,,,,"hl","Ochil",,,"R","VBVCVGWCWGXFYCYGYHYIZBaIbGcBdBdCeDfEgFjFkEmEnFsBtDuB"],"type":"白"},{"id":"149","name":"メタルわんこ","hiragana":"めたるわんこ","stages":[,,,,,"TZr","ltv","t","lt","VDVGWBWGYBZHcCfBiCmBqBtFuDvI"],"type":"メ"},{"id":"150","name":"コニャンダム","hiragana":"こにゃんだむ","stages":[,,,,,,,,,"WG"],"type":"赤"},{"id":"151","name":"松黒蔵","hiragana":"まつくろぞう","stages":[,,,,,"Rn",,,,"WDWGXCbGcFeBfFtC"],"type":"黒"},{"id":"162","name":"天使ヒオコエル","hiragana":"てんしひおこえる","stages":[,,,,,,,,,"XBXGYCdCfFtG"],"type":"天"},{"id":"169","name":"エイリワン","hiragana":"えいりわん","stages":[,,,"BCEHJLMOPQTVYZbdfglmoprsuw","BCEHLMOPQTVYZbdfglmoprsuw","BCEHLOPQSTVYZbdfgilmoprsuw","CFILOPYceknprt","FILOYcekpr","ILNOQXYcekp","YBYGYIZHaCaHvI"],"type":"エ"},{"id":"170","name":"ワーニック","hiragana":"わーにっく","stages":[,,,"ikmuvw","JYikmvw","JMTYkmtvw","DFHIPSUXZbcert","DFHIPSUZbcefrt","DFHIMNSUZbcefr","aCeElB"],"type":"エ"},{"id":"171","name":"カーバチャン","hiragana":"かーばちゃん","stages":[,,,"GKSUZdeltw","GKSUZdet","GKSZdeptw","CEGKRTYio","CEKTYio","CYio","YCeE"],"type":"エ"},{"id":"172","name":"ゴマサーマン","hiragana":"ごまさーまん","stages":[,,,"QVYbekov","HQVbekovw","HSVYbekovw","HMRUYbo","HMRUYbo","UVYbo","YEaFcEnB"],"type":"エ"},{"id":"173","name":"レディ・ガ","hiragana":"れでぃが","stages":[,,,"UXchipvw","UXcipv","JUXclpv","LTip","LOp","LOjp","YFcC"],"type":"浮エ"},{"id":"174","name":"デカメガネル","hiragana":"でかめがねる","stages":[,,,"mpuw","mpuw","Umpuw","ELXf","ELf","ELf","bElB"],"type":"エ"},{"id":"175","name":"ヤドカリー","hiragana":"やどかりー","stages":[,,,"MPYktw","MPkt","Mkt","COZf","COZ","CJO","YClB"],"type":"エ"},{"id":"176","name":"カヲルさん","hiragana":"かをるさん","stages":[,,,"Ys","s","hs","HOZp","HZp","HSZp","aHbCcBdCgC"],"type":"浮エ"},{"id":"177","name":"クマンチュー","hiragana":"くまんちゅー","stages":[,,,"dfqtw","Odfqtw","Odqt","Pi","Pi","FNPi","YGcCeElB"],"type":"エ"},{"id":"178","name":"破壊生物クオリネン","hiragana":"はかいせいぶつくおりねん","stages":[,,,"w",,,,"j","j","gFnB"],"type":"浮エ"},{"id":"179","name":"イノヴァルカン","hiragana":"いのう゛ぁるかん","stages":[,,,"v","v","v","Iku","Iku","Iku","YIZDgFlCtB"],"type":"エ"},{"id":"180","name":"エリザベス56世","hiragana":"えりざべすごじゅうろくせい","stages":[,,,"rw","rw","Tr","Khs","Khs","Ks","YHbBfCjC"],"type":"エ"},{"id":"182","name":"ギャラクシーニャンダム","hiragana":"ぎゃらくしーにゃんだむ","stages":[,,,,"Y",,,"X",,"ZDaHbDeEiE"],"type":"エ"},{"id":"183","name":"反逆のヴァルキリー","hiragana":"はんぎゃくのう゛ぁるきりー","stages":[,,,,"w",,,,],"type":"浮エ"},{"id":"184","name":"ハサミーマン","hiragana":"はさみーまん","stages":[,,,,"LXsw","LPUXs","MWmn","MWmn","GHUWmn","ZDZHaCbBgC"],"type":"エ"},{"id":"185","name":"サイバーX","hiragana":"さいばーえっくす","stages":[,,,,"QYfuv","NQbfkv","Sb","Sb","KSb","ZCaFcCrE"],"type":"エ"},{"id":"186","name":"プドール夫人","hiragana":"ぷどーるふじん","stages":[,,,,"TYsw","KPTsw","Wchkn","WXchkn","Nhkn","ZDZHcC"],"type":"エ"},{"id":"187","name":"教授","hiragana":"きょうじゅ","stages":[,,,,,,,,,"gBiFkFmCoEvC"],"type":"赤"},{"id":"207","name":"カルピンチョ","hiragana":"かるぴんちょ","stages":[,,,,,,,,,"ZBZIaGdDeGfEmCnDtGvB"],"type":"赤"},{"id":"208","name":"バトルコアラッキョ","hiragana":"ばとるこあらっきょ","stages":[,,,,,,,,,"ZIaBbDcFdEhDjCmCmGoGpGuG"],"type":"赤"},{"id":"209","name":"ツバメンズ","hiragana":"つばめんず","stages":[,,,,,,,,,"ZEZIbEbGdFeDfGgBhFjEnCnGoDpBsEtDuE"],"type":"浮"},{"id":"210","name":"よっちゃん","hiragana":"よっちゃん","stages":[,,,,,"Mft",,,,"aFcCfCjFlB"],"type":"浮エ"},{"id":"211","name":"アルパッカ","hiragana":"あるぱっか","stages":[,,,,,"Qdw",,,"h","aFcE"],"type":"エ"},{"id":"212","name":"ヨキカナ","hiragana":"よきかな","stages":[,,,,,"iu",,,,"aEdBfGmD"],"type":"エ"},{"id":"213","name":"パラサイトブンブン","hiragana":"ぱらさいとぶんぶん","stages":[,,,,,"Y",,"X",,"aHbFdEpG"],"type":"浮エ"},{"id":"214","name":"暴走のネコムート","hiragana":"ぼうそうのねこむーと","stages":[,,,,,"w",,,],"type":"浮エ"},{"id":"237","name":"ドリュウ","hiragana":"どりゅう","stages":[,,,,,,,,,"aIdFgGkEmFsBvF"],"type":"白"},{"id":"256","name":"ミスターエンジェル","hiragana":"みすたーえんじぇる","stages":[,,,,,,,,,"cBcFdGgGkFnGrBvE"],"type":"天"},{"id":"257","name":"キョセーヌ","hiragana":"きょせーぬ","stages":[,,,,,,,,,"bEcFeBjClFvG"],"type":"赤黒"},{"id":"258","name":"タッちゃん","hiragana":"たっちゃん","stages":[,,,,,,,,,"cEdFeBfDjBkDmEsCtCvC"],"type":"黒"},{"id":"260","name":"わんこずきんミーニャ","hiragana":"わんこずきんみーにゃ","stages":[,,,,,,,,,"bG"],"type":"白"},{"id":"263","name":"イノエンジェル","hiragana":"いのえんじぇる","stages":[,,,,,,,,,"dGeFjFlCoFpGvEvH"],"type":"天"},{"id":"268","name":"ヒカル","hiragana":"ひかる","stages":[,,,,,,,,,"eGfDgFjDmBoBvF"],"type":"白"},{"id":"274","name":"ちびぶんぶん","hiragana":"ちびぶんぶん","stages":[,,,,,,,,,"fGiBkCnGqFvFwB"],"type":"浮"},{"id":"282","name":"イノワール","hiragana":"いのわーる","stages":[,,,,,,,,,"gGiEmEoFpGvC"],"type":"黒"},{"id":"286","name":"ゾンビワン","hiragana":"ぞんびわん","stages":[,,,,,,,,,"hBhGiDjDjGkGvI"],"type":"ゾ"},{"id":"287","name":"にょろろん","hiragana":"にょろろん","stages":[,,,,,,,,,"hChGiDkCoCpErCsD"],"type":"ゾ"},{"id":"288","name":"カバタリアン","hiragana":"かばたりあん","stages":[,,,,,,,,,"hEiD"],"type":"ゾ"},{"id":"289","name":"トンシー","hiragana":"とんしー","stages":[,,,,,,,,,"hEiDjDsD"],"type":"ゾ"},{"id":"290","name":"ジャッキー・ペンZ","hiragana":"じゃっきーぺんぜっと","stages":[,,,,,,,,,"hCiBkC"],"type":"ゾ"},{"id":"291","name":"ゴリ・ンジュ","hiragana":"ごりんじゅ","stages":[,,,,,,,,,"hGiDjBjGkGoC"],"type":"ゾ"},{"id":"292","name":"ブチゴマさま","hiragana":"ぶちごまさま","stages":[,,,,,,,,,"hEjGkCkGnB"],"type":"ゾ"},{"id":"293","name":"スカルボクサー","hiragana":"すかるぼくさー","stages":[,,,,,,,,,"hGjDkEkGnE"],"type":"ゾ"},{"id":"294","name":"ワニボン","hiragana":"わにぼん","stages":[,,,,,,,,,"hEhGiBjEkGqDsD"],"type":"ゾ"},{"id":"295","name":"墓手太郎","hiragana":"はかてたろう","stages":[,,,,,,,,,"hGjGkF"],"type":"ゾ"},{"id":"305","name":"墓手花子","hiragana":"はかてはなこ","stages":[,,,,,,,,,"jG"],"type":"ゾ"},{"id":"306","name":"オオさん","hiragana":"おおさん","stages":[,,,,,,,,,"iGlDvD"],"type":"ゾ"},{"id":"311","name":"ヒツギイヌ","hiragana":"ひつぎいぬ","stages":[,,,,,,,,,"jBkBvD"],"type":"ゾ"},{"id":"312","name":"キャベロン","hiragana":"きゃべろん","stages":[,,,,,,,,,"jEkEqDvD"],"type":"ゾ"},{"id":"318","name":"犬武者武蔵","hiragana":"いぬむしゃむさし","stages":[,,,,,,,,,"kG"],"type":"ゾ"},{"id":"320","name":"イルカ娘","hiragana":"いるかむすめ","stages":[,,,,,,,,,"lGmFnCqEvF"],"type":"白"},{"id":"342","name":"イカ天","hiragana":"いかてん","stages":[,,,,,,,,,"mGnDoCsEvE"],"type":"天"},{"id":"357","name":"ケロ助","hiragana":"けろすけ","stages":[,,,,,,,,,"oGpEsCvF"],"type":"白"},{"id":"362","name":"エリートエイリワン","hiragana":"えりーとえいりわん","stages":[,,,,,,"BCDFGKMNQSTVWXZcehiluw","CDFGIKMQSVWZehiluw","CDEFGKPQTWZehijlruvw","qBqEqGrErFvI"],"type":"エ"},{"id":"363","name":"スター・ペン","hiragana":"すたーぺん","stages":[,,,,,,"FGMNPRVYeijlpvw","CFGMNOPRTVYeijlpvw","CFGOPTXYeilptvw","qCqFrF"],"type":"エ"},{"id":"364","name":"グレゴリー将軍","hiragana":"ぐれごりーしょうぐん","stages":[,,,,,,"JLQXZcqw","JLQXZcq","DILOQRZcqw","qGrFsFtB"],"type":"エ"},{"id":"365","name":"ハハパオン","hiragana":"ははぱおん","stages":[,,,,,,"NRafjlw","NRafl","JNRal","qDrFsF"],"type":"エ"},{"id":"366","name":"巨匠","hiragana":"きょしょう","stages":[,,,,,,"Shjtw","Shjt","at","qErErFsCtB"],"type":"エ"},{"id":"367","name":"キャプテン・モグー","hiragana":"きゃぷてんもぐー","stages":[,,,,,,"Xadmpv","Hadpv","HTdmp","rBrF"],"type":"エ"},{"id":"368","name":"スペースマンボルグ","hiragana":"すぺーすまんぼるぐ","stages":[,,,,,,"envw","env","Vu","qFrCrF"],"type":"浮エ"},{"id":"369","name":"神さま","hiragana":"かみさま","stages":[,,,,,,"w",,],"type":"浮"},{"id":"377","name":"大夢くん","hiragana":"おおむくん","stages":[,,,,,,,,,"qGvG"],"type":"天エ"},{"id":"381","name":"天使ブッタ","hiragana":"てんしぶっだ","stages":[,,,,,,,,,"rGsBvE"],"type":"天"},{"id":"389","name":"ヒウマ","hiragana":"ひうま","stages":[,,,,,,,,,"sGtCvC"],"type":"赤"},{"id":"390","name":"ウルトラメェメェ","hiragana":"うるとらめぇめぇ","stages":[,,,,,,,"BGJNPRWflmrt","PRZft","tDtGvG"],"type":"エ"},{"id":"407","name":"レジェンドブンブンΩ","hiragana":"れじぇんどぶんぶんおめが","stages":[,,,,,,,,,"wB"],"type":"浮"},{"id":"419","name":"マナブくん","hiragana":"まなぶくん","stages":[,,,,,,,"KQUXchnuw","BGKQUcnw"],"type":"エ"},{"id":"420","name":"ゲコック","hiragana":"げこっく","stages":[,,,,,,,"RTVaimuvw","FHit"],"type":"エ"},{"id":"421","name":"神さま（本気）","hiragana":"かみさまほんき","stages":[,,,,,,,"w",],"type":"白"},{"id":"445","name":"ミニスターサイクロン","hiragana":"みにすたーさいくろん","stages":[,,,,,,,,"BJMRWcejorvw"],"type":"エ"},{"id":"446","name":"チンアナ5兄弟","hiragana":"ちんあなごきょうだい","stages":[,,,,,,,,"NSVbfu"],"type":"エ"},{"id":"447","name":"ルーパールーパー","hiragana":"るーぱーるーぱー","stages":[,,,,,,,,"Xahnv"],"type":"エ"},{"id":"448","name":"ファイナルギガグランド神さま","hiragana":"ふぁいなるぎがぐらんどかみさま","stages":[,,,,,,,,"w"],"type":"白"}];
+const STAMINA_DATA = [[,5,5,8,8,10,10,16,12,12,14,18,20,18,20,24,26,20,24,28,30,24,28,32,40,25,30,32,36,40,24,26,30,35,28,30,40,30,35,40,30,32,35,30,32,40,50,50,50],[,15,15,18,18,20,20,26,22,22,24,28,30,28,30,34,36,30,34,38,40,34,38,42,50,35,40,42,46,50,34,36,40,45,38,40,50,40,45,50,40,42,45,40,42,50,60,60,60],[,25,25,28,28,30,30,36,32,32,34,38,40,38,40,44,46,40,44,48,50,44,48,52,60,45,50,52,56,60,44,46,50,55,48,50,60,50,55,60,50,52,55,50,52,60,70,70,70],[,30,30,32,32,34,34,35,32,34,35,40,38,40,42,45,50,48,46,50,48,46,50,52,70,48,52,53,55,60,50,50,52,60,50,52,54,56,56,58,57,60,60,65,60,62,60,75,80],[,40,40,42,42,44,44,45,42,44,45,50,48,50,52,55,60,58,56,60,58,56,60,62,80,58,62,63,65,70,60,60,62,70,60,62,64,66,66,68,67,70,70,75,70,72,70,85,90],[,50,50,52,52,54,54,55,52,54,55,60,58,60,62,65,70,68,66,70,68,66,70,72,90,68,72,73,75,80,70,70,72,80,70,72,74,76,76,78,77,80,80,85,80,82,80,95,100],[,50,50,52,52,54,54,55,52,54,55,58,57,60,62,65,64,70,68,72,70,73,71,75,80,72,74,77,70,75,73,72,74,75,72,70,73,75,77,76,78,80,82,80,83,77,85,95,100],[,60,60,62,62,64,64,65,62,64,65,68,67,70,72,75,74,80,78,82,80,83,81,85,90,82,84,87,80,85,83,82,84,85,82,80,83,85,87,86,88,90,92,90,93,87,95,105,110],[,70,70,72,72,74,74,75,72,74,75,78,77,80,82,85,84,90,88,92,90,93,91,95,100,92,94,97,90,95,93,92,94,95,92,90,93,95,97,96,98,100,102,100,103,97,105,115,120],[[,50,50,55,60,60,60,70,90],[,60,60,65,70,70,70,80,100],[,65,70,75,75,80,80,90,120],[,70,75,75,80,80,85,90,120],[,70,75,80,90,95,120],[,70,75,80,80,85,85,90,120],[,70,75,80,80,85,85,90,130],[,75,80,80,85,85,90,95,120],[,75,80,80,85,85,90,110,140],[,80,85,100,90,120,200],[,80,80,85,90,90,90,100,120],[,85,90,95,95,100,100,110,140],[,90,95,95,100,100,105,110,140],[,90,95,100,110,115,140],[,90,95,100,110,125,150],[,90,120,95,100,110,115,130,145],[,100,105,110,112,120,145,150,160],[,100,105,110,115,130,160],[,110,90,110,100,120,140],[,85,90,100,95,100,100,95,120],[,85,90,90,95,100,125],[,85,90,90,50,100,125],[,80,85,90,95,100,150],[,80,85,85,90,95,120],[,75,80,80,85,85,90,100,120],[,75,80,80,85,70,90,95,120],[,80,90,90,95,95,100,110,125],[,100,105,105,110,115,140],[,100,105,90,115,125],[,105,110,90,110,115,130],[,110,90,105,110,115,130],[,105,95,110,105,115,135],[,110,115,70,110,120,135],[,110,115,120,110,120,140],[,110,120,105,115,125,140],[,120,110,125,115,130,145],[,125,130,115,130,120,160],[,135,140,120,135,140,150],[,140,145,135,135,145,160],[,140,150,140,150,155,165],[,150,160,100,155,160,175],[,150,155,150,145,155,175],[,160,155,155,150,160,180],[,165,160,150,160,170,185],[,170,160,150,165,175,190],[,175,165,155,165,180,190],[,180,160,160,170,180,200],[,190,170,170,180,180,190,200,800],[,200]]];
+const STAGE_NAME_DATA = [[,"長崎県","佐賀県","鹿児島県","熊本県","宮崎県","大分県","福岡県","高知県","愛媛県","徳島県","香川県","山口県","広島県","島根県","岡山県","鳥取県","兵庫県","和歌山県","大阪府","京都府","奈良県","三重県","滋賀県","福井県","石川県","愛知県","岐阜県","富山県","静岡県","山梨県","長野県","新潟県","神奈川県","千葉県","東京都","埼玉県","群馬県","栃木県","茨城県","福島県","宮城県","山形県","岩手県","秋田県","青森県","北海道","沖縄県","西表島",],[,"日本","韓国","中国","モンゴル","ロシア","ノルウェー","イギリス","デンマーク","ドイツ","フランス","スペイン","モナコ","イタリア","ギリシャ","トルコ","ドバイ","インド","ネパール","タイ","カンボジア","フィリピン","シンガポール","オーストラリア","深淵の大渦","マダガスカル","ケニア","サウジアラビア","エジプト","サハラ","ガーナ","南アフリカ","アルゼンチン","イースター島","マチュピチュ","コロンビア","ジャマイカ","メキシコ","ハリウッド","ラスベガス","アラスカ","カナダ","グリーンランド","ニューヨーク","NASA","バミューダ","ブラジル","浮遊大陸","月",],[,"地球","火星","木星","土星","金星","水星","太陽","ウラヌス","ネプチューン","トリトン","プルートゥ","赤い長方形星雲","エスキモー星雲","キャッツアイ星雲","卵星雲","ひょうたん星雲","アルタイル","シリウス","カノープス","ベガ","アルデバラン","ベテルギウス","デネブ","惑星スナック","サイータ星","魁皇星","大マゼラン星雲","ブータラ星","モスカンダグ","コロン星","ヤキソパーン","ウメ星","ダラララ","マイドムリ","メルトズ","ウラルー","アグハムム","ソモロン","アバ・ブア","ティターン","デススタン","ゴリラの惑星","チョイバトロン星","クリムゾン星","N77星雲","アンドロメダ","ブラックホール","ビッグバン",],[["伝説のはじまり","情熱の国","グルコサミン砂漠","ネコども海を渡る","見つめてキャッツアイ","ウエスタン街道","マグロ海域","バンブー島","ぷにぷに鍾乳洞","ボルケーノ火山","千里の道","アオ・ザ・カナ","軍艦島","つめとぎの廊下","パルテノン神殿","ずんどこ海水浴場","アルカトラズ島","脱獄トンネル","カポネの監獄","シルクロード","闇へと続く地下道","魔王の豪邸","終わりを告げる夜","バトルロワイアル","戦争のつめあと","海を汚す悪しき者","心と体、繋ぐもの","脆弱性と弱酸性","導かれしネコ達","暗黒コスモポリス","ガラ・パ・ゴス","岩海苔半島","恐ろし連邦","亡者の住まう地","絶島パンデミック","ふくろのねずみランド","ハリーウッド帝国","こしぎんちゃくの浜辺","雲泥温泉郷","風待ちアイランド","ITカタコンベ","変覧会の絵","エリア22","超越サバンナ","ブリザード自動車道","シンギュラリティ村","オワーリ大陸","伝説のおわり","古代研究所"],[[,"大地を揺るがす","あの恐怖、再び","おつかれサンセット","メランコリー湿地","ぷるるん広場","愛情のまなざし","牧場の守護者","眠れる獅子"],[,"ニャンダルシア","パエリア草原","フラメン坑","サングリア川","ガスパチョ高原","チュロス・ナイト","乾いた庭園","タパス砂漠"],[,"コンドロイチン砂丘","セサ民遺跡","イソフラボン洞窟","カテキン丘陵","リコピンの夕焼け","プロポリスオアシス","ペプチド雪原","ヒアルロン山"],[,"無茶ぶり進水式","ユーザン海原","人魚の入り江","カオスラグーン","なんちゃって海賊","ホコタテ漁場","テングサ島","海の水は塩辛い"],[,"ぽろり鉱石","セクシー鍾乳洞","ドキドキ穴","ぷりぷりくぼみ","フタこぶ岩","スリルの代償"],[,"ガンマンの黄昏","カウボーイ天国","お尋ね者の夜","マカロニタウン","さすらいの口笛","がっかり用心棒","テンガロン山","ロデオナイト"],[,"ベニマグロ海岸","ピチピチ漁場","ぷらっとオーシャン","カルパッチョ沖","排他的経済水域","最終兵器トロ","冷凍マグロ戦線","解体ショー洞窟"],[,"チクチク高原","タケノコ海岸","殺人鬼ジャングル","げろげろ沼","もっさり坑道","星くず街道","キノコ崖","暁フロンティア"],[,"ミルキートンネル","ふわふわ暗黒兵器","悪魔の壁画","隙間風のささやき","甘えんぼ暗殺者","うろたえる岩","雨漏り洞窟","ぽっちゃり性善説"],[,"半身浴岩","ほっこり間欠泉","とろーりマグマ","炎の檻","火口を守る者","メラメラカルデラ"],[,"ポテンシャルロード","憂愁の木","そよかぜの歌声","哲学の道","境界線の晩鐘","流した涙の川","輝く道","試練の谷底"],[,"磯のささやき","サザナミ・アイランド","ダークオクトパスの海","ポセイドンのこしかけ","月明かりのビーチ","コーラルサンゴ礁","月の箱舟","殺戮兵器シラ・ス"],[,"ネギトロ平野","カニミソ草原","イクラ岩窟","ウニ街道","トビコ原生林","納豆海岸","エンガワの森","アマエビフロンティア"],[,"ダンボール回廊","マタタビの夢","ガリガリウォール","木くずを掻き分けて","バリバリ柱","乱暴者の番人"],[,"ゼウスの祭壇","アキレスの剣","エロスの街道","ガイアの夜明け","アフロディテの門","ハデスの迷宮"],[,"潮干狩りの浜","ムツゴロウパーク","水着美女の面影","イモ洗いプール","ビーチパラソル畑","いにしえのビキニ","カラフルカクテル","星降る大海"],[,"カモメ海岸","ペリカン島","地下制御室","悪党の密林","バラバラチキンレース","ねこ裁判","監獄草原","看守と墓守"],[,"茶罪～ギル・ティ～","実刑判決","ハリートンネル","夜のしじま","落とし穴地帯","大脱走"],[,"脱獄日誌","ラスト・ギャング","プリズン・破","シャバの王者","嘘つきの末路","豚小屋のタブー"],[,"ガンダーラ休憩所","ユートピアはあちら","ゴダイゴ峠","モンキーマジック","異国の門","マルコ・ポーロード","豚の残飯","河童の冷や汗"],[,"転ばぬ先の杖","暗い・狭い・怖い道","レッド・アラート","人生の落とし穴","かすかな晩鐘","アンダーワールド"],[,"セレブな玄関","バスルーム","オシャレVIPルーム","拷問部屋","独裁者の庭","魔王の寝室"],[,"裏切りの宴","終焉のカタルシス","黒い予感","砕けた仮面","アガペーの檻","赤いきつねの聖者"],[,"ロイヤル・ミル・クティ","怒りと闘争心","忍び寄る戦慄の詩","卑怯者の罠","闇より生まれし宿敵","魚介類と血のにおい"],[,"ワルキューレ平原","ぶっとび地雷原","クーゲルシュライバー","ぬかるみ塹壕","スナイパージャングル","斜陽のソルジャー","父の背中","境界線奪還作戦"],[,"石油プラットホーム","汗とアルデヒド","いにしえの裁判","あやしい自治体","ポイステ海岸","ベンゼン畑","政府の犬","あまくだり海流"],[,"夕焼けの咆哮","ゲシュタルト、崩壊","戦士の黎明","呪われた永久凍土","ねこの証","愚者の絶望","メタボリック症候群","愛と死"],[,"せめて、ネコらしく","円卓の騎士","おにゃんこカタルシス","美しい終わり","悪夢からの覚醒","おぼえたての愛"],[,"新たなる戦い","ミステリーサークル","野鳥観察","言葉の端のトゲ","ブラックウェーブ"],[,"ハングリーフォレスト","身の程知らずの巣","通勤ラッシュ","ドッキングジェノサイダー","地下帝国からの刺客","暗黒街の支配者"],[,"DNAとDHA","夕焼けの密猟者","遭難者の群れ","異星生態調査団","楽園のいきもの達","環境保護団体"],[,"りんりん防風林","イベリコ平野","泣き砂海岸","ゴールデン街","鈍足ドライブウェイ","武家屋敷お家騒動"],[,"クリムゾン広場","インテリゲンチャ","ポッポー領土","バトル海の決戦","宇宙開発局","スパイより愛を込めて"],[,"死霊の館","いけにえ沼","ムール街の悪夢","ポルターガイストリート","ホワイト・ライト・ナイト","猫たちの沈黙"],[,"感染者密航","ハイテク昆布漁","先祖の行進","脱出を阻む者","怒りのマグロ戦線","感染、島の主"],[,"お出迎え入場門","無気力コースター","リアルVR地獄","プラス50度の世界","誘惑のチキンルーム","ボーンデッドアパートメント"],[,"パパラッチフィーバー","因縁ゴシップスター","バブリーヒルズ白書","子役上がり","セクシースキャンダル","ウニバーサンスタジオ"],[,"よたもの遊泳大会","ヘアーサロン潮風","ディープシー決死隊","ぺこぺこパレード","大御所大博覧会","もう陸には帰れない"],[,"自家製電気風呂","熱湯風呂我慢大会","ケミカル長寿の湯","垢い敵、黒い汗","源泉に潜む者達","湯けむり極楽地獄"],[,"むっちり隠れ港","ロマンスグレーハイウェイ","泥酔マッサージャー","豚箱恋愛沼","フェロモン門","天空秘宝の館"],[,"キリバンの番人","ダイヤルアップ回廊","テレホー台座","Mrs.ドスの墓","聖人ブラクラの遺骨","怨叫カプラ"],[,"ヘタうまキュビズム","癒し系地獄絵図","和尚のスケベな水墨画","一筆三億五千万円","ヤンキー宗教画","館長の自画像"],[,"ローズウェイ事件","キャットミューティレーション","マダムスキー型UFO","チュパチュパカブラ遭遇","グースカツンツン大爆発","あなた疲れてるのよ"],[,"弱肉朝食","霊峰ニクマンジャロ","原始の強敵、再び","ウキウキ乾季","エレクトロサファリパーク","天国に一番近い水飲み場"],[,"あかぎれジャンクション","ダダ洩れ海底トンネル","しもやけパーキングエリア","ぬくもり対向車線","眠眠交通警備隊","料金所ヒートショック"],[,"ユビキタス販売所","VR稲刈り場","ウェアラブル一軒家","8K肥溜め","夕焼けブロックチェーン","ゲノム盆踊り"],[,"最果ての祠","終末の谷","ファイナルタワー","ラストラビリンス","終焉の洞窟","フィナーレ神殿"],[,"決断の時","復讐の準備","栄光のグローリー","命のせせらぎ","復活の偽呪文","契約の杯","風そよぐ黄昏時","破られた誓い"],[,"太古の力"]]]];
+const CHAPTER_INFO = [
+    { name: '日本編 第1章', short: '日1' }, { name: '日本編 第2章', short: '日2' }, { name: '日本編 第3章', short: '日3' },
+    { name: '未来編 第1章', short: '未1' }, { name: '未来編 第2章', short: '未2' }, { name: '未来編 第3章', short: '未3' },
+    { name: '宇宙編 第1章', short: '宇1' }, { name: '宇宙編 第2章', short: '宇2' }, { name: '宇宙編 第3章', short: '宇3' },
+    { name: 'レジェンド', short: 'レ' }
+];
+const ENEMY_INPUT_IDS = ['enemy1-input', 'enemy2-input', 'enemy3-input'];
+const LEGEND_CHAPTER_INDEX = 9;
+const VALID_ENEMY_NAMES = new Set(ENEMY_DATA.map(e => e.name));
+
+document.addEventListener('DOMContentLoaded', () => {
+    initChapterRadios();
+    ENEMY_INPUT_IDS.forEach(id => initAutocomplete(document.getElementById(id)));
+    document.getElementById('search-button').addEventListener('click', handleSearch);
+});
+
+const initChapterRadios = () => {
+    const container = document.getElementById('chapter-radio-container');
+    container.innerHTML = CHAPTER_INFO.map((info, index) => `
+        <div class="chapter-radio-item">
+            <input type="radio" name="chapter-selection" id="chapter-${index}" value="${index}" ${index === LEGEND_CHAPTER_INDEX ? 'checked' : ''}>
+            <label for="chapter-${index}">
+                <span class="label-long">${info.name}</span>
+                <span class="label-short">${info.short}</span>
+            </label>
+        </div>`).join('');
+};
+
+const initAutocomplete = (input) => {
+    let currentFocus = -1;
+
+    const closeAllLists = (elmnt) => {
+        document.querySelectorAll(".autocomplete-items").forEach(list => {
+            if (elmnt !== list && elmnt !== input) {
+                list.remove();
+            }
+        });
+    };
+
+    input.addEventListener("input", function() {
+        const value = this.value;
+        closeAllLists();
+        if (!value) return;
+
+        currentFocus = -1;
+        const list = document.createElement("div");
+        list.id = `${this.id}-list`;
+        list.className = "autocomplete-items";
+        this.parentNode.appendChild(list);
+
+        const matches = ENEMY_DATA
+            .filter(e => e.name.includes(value) || e.hiragana.includes(value))
+            .sort((a, b) => (a.name.startsWith(value) || a.hiragana.startsWith(value)) ? -1 : 1)
+            .slice(0, 10);
+            
+        if (matches.length === 0) return closeAllLists();
+
+        list.innerHTML = matches.map(enemy => `<div><strong>${enemy.name}</strong></div>`).join('');
+        list.querySelectorAll('div').forEach(item => {
+            item.addEventListener("click", () => {
+                input.value = item.textContent;
+                closeAllLists();
+            });
+        });
+    });
+
+    input.addEventListener("keydown", function(e) {
+        let list = document.getElementById(`${this.id}-list`);
+        if (!list) return;
+        let items = list.getElementsByTagName("div");
+        if (items.length === 0) return;
+
+        const updateActive = () => {
+            [...items].forEach(item => item.classList.remove("autocomplete-active"));
+            if (currentFocus >= items.length) currentFocus = 0;
+            if (currentFocus < 0) currentFocus = items.length - 1;
+            items[currentFocus].classList.add("autocomplete-active");
+        };
+
+        switch (e.key) {
+            case 'ArrowDown': currentFocus++; updateActive(); break;
+            case 'ArrowUp': currentFocus--; updateActive(); break;
+            case 'Enter':
+                e.preventDefault();
+                if (currentFocus > -1) items[currentFocus]?.click();
+                break;
+        }
+    });
+
+    document.addEventListener("click", (e) => closeAllLists(e.target));
+};
+
+const decodeChar = c => c.charCodeAt(0) < 97 ? c.charCodeAt(0) - 65 : c.charCodeAt(0) - 71;
+
+const getEnemyStageIds = (enemyName, chapterIndex) => {
+    const enemy = ENEMY_DATA.find(e => e.name === enemyName);
+    if (!enemy || !enemy.stages[chapterIndex]) return [];
+    
+    const stageStr = enemy.stages[chapterIndex];
+    if (chapterIndex === LEGEND_CHAPTER_INDEX) {
+        return stageStr.match(/../g)?.map(p => [decodeChar(p[0]), decodeChar(p[1])]) || [];
+    }
+    return [...stageStr].map(decodeChar);
+};
+
+const findCommonStageIds = (arr1, arr2) => {
+    if (!arr1 || !arr2) return [];
+    const set2 = new Set(arr2.map(item => JSON.stringify(item)));
+    return arr1.filter(item => set2.has(JSON.stringify(item)));
+};
+
+const getStageDetails = (stageId, chapterIndex) => {
+    const nameData = STAGE_NAME_DATA;
+    if (chapterIndex < LEGEND_CHAPTER_INDEX) {
+        return { id: stageId, name: nameData[Math.floor(chapterIndex / 3)][stageId] || '不明', stamina: STAMINA_DATA[chapterIndex][stageId] };
+    }
+    const [mainIdx, subIdx] = stageId;
+    const mainTitle = nameData[3][0][mainIdx];
+    const subTitle = nameData[3][1][mainIdx]?.[subIdx];
+    if (!mainTitle || !subTitle) return null;
+    return { id: stageId, name: [mainTitle, subTitle], stamina: STAMINA_DATA[chapterIndex][mainIdx][subIdx] };
+};
+
+const getTopStagesByStamina = (stageIds, chapterIndex) => {
+    return stageIds
+        .map(id => getStageDetails(id, chapterIndex))
+        .filter(Boolean)
+        .sort((a, b) => a.stamina - b.stamina)
+        .slice(0, 5);
+};
+
+const handleSearch = () => {
+    const resultsContainer = document.getElementById('results-container');
+    const selectedRadio = document.querySelector('#chapter-radio-container input:checked');
+    if (!selectedRadio) {
+        resultsContainer.innerHTML = '<p>検索対象の章を選択してください。</p>';
+        return;
+    }
+    const chapterIndex = parseInt(selectedRadio.value, 10);
+    const enemyNames = ENEMY_INPUT_IDS.map(id => document.getElementById(id).value).filter(name => VALID_ENEMY_NAMES.has(name));
+
+    if (enemyNames.length === 0) {
+        resultsContainer.innerHTML = '<p>有効な敵キャラクターを1体以上入力してください。</p>';
+        return;
+    }
+
+    const stageIdCombinations = getStageIdCombinations(enemyNames, chapterIndex);
+    const topStagesByCombination = new Map();
+    for (const [label, ids] of stageIdCombinations.entries()) {
+        const topStages = getTopStagesByStamina(ids, chapterIndex);
+        if (topStages.length > 0) topStagesByCombination.set(label, topStages);
+    }
+
+    if (topStagesByCombination.size === 0) {
+        resultsContainer.innerHTML = `<p>条件に一致するステージは見つかりませんでした。</p>`;
+        return;
+    }
+    
+    const optimalCombination = findOptimalCombination(topStagesByCombination, enemyNames);
+    renderResults(resultsContainer, optimalCombination, topStagesByCombination, chapterIndex, enemyNames);
+};
+
+const getStageIdCombinations = (enemyNames, chapterIndex) => {
+    const combinations = new Map();
+    const enemyStageIds = enemyNames.map(name => getEnemyStageIds(name, chapterIndex));
+
+    enemyNames.forEach((name, i) => combinations.set(name, enemyStageIds[i]));
+
+    for (let i = 0; i < enemyNames.length; i++) {
+        for (let j = i + 1; j < enemyNames.length; j++) {
+            const label = `${enemyNames[i]} & ${enemyNames[j]}`;
+            combinations.set(label, findCommonStageIds(enemyStageIds[i], enemyStageIds[j]));
+        }
+    }
+
+    if (enemyNames.length === 3) {
+        const label = `${enemyNames[0]} & ${enemyNames[1]} & ${enemyNames[2]}`;
+        const common123 = findCommonStageIds(findCommonStageIds(enemyStageIds[0], enemyStageIds[1]), enemyStageIds[2]);
+        combinations.set(label, common123);
+    }
+    return combinations;
+};
+
+const findOptimalCombination = (topStagesByCombination, targetEnemies) => {
+    let bestCombination = { stages: [], stamina: Infinity };
+    const getStageKey = (stage) => JSON.stringify(stage.id);
+
+    const searchPatterns = [];
+    if (targetEnemies.length === 1) searchPatterns.push([targetEnemies[0]]);
+    if (targetEnemies.length === 2) searchPatterns.push([`${targetEnemies[0]} & ${targetEnemies[1]}`], [targetEnemies[0], targetEnemies[1]]);
+    if (targetEnemies.length === 3) {
+        searchPatterns.push(
+            [`${targetEnemies[0]} & ${targetEnemies[1]} & ${targetEnemies[2]}`],
+            [`${targetEnemies[0]} & ${targetEnemies[1]}`, targetEnemies[2]],
+            [`${targetEnemies[0]} & ${targetEnemies[2]}`, targetEnemies[1]],
+            [`${targetEnemies[1]} & ${targetEnemies[2]}`, targetEnemies[0]],
+            [targetEnemies[0], targetEnemies[1], targetEnemies[2]]
+        );
+    }
+    
+    searchPatterns.forEach(pattern => {
+        const currentStages = new Map(); // Use Map to handle unique stages efficiently
+        for (const label of pattern) {
+            const topStage = topStagesByCombination.get(label)?.[0];
+            if (!topStage) return; // This pattern is invalid
+            currentStages.set(getStageKey(topStage), topStage);
+        }
+
+        const stages = Array.from(currentStages.values());
+        const currentStamina = stages.reduce((sum, stage) => sum + stage.stamina, 0);
+
+        if (currentStamina < bestCombination.stamina) {
+            bestCombination = { stages, stamina: currentStamina };
+        }
+    });
+
+    return bestCombination.stamina === Infinity ? null : bestCombination;
+};
+
+const renderResults = (container, optimal, allCombinations, chapterIndex, targets) => {
+    container.innerHTML = '';
+    if (optimal) {
+        const enemiesInStage = (stage) => targets.filter(name => getEnemyStageIds(name, chapterIndex).some(id => JSON.stringify(id) === JSON.stringify(stage.id)));
+        const optimalHtml = `
+            <div class="result-section">
+                <div class="result-header">最適ステージ (合計統率力: ${optimal.stamina})</div>
+                <div class="result-content" style="padding: 0;">
+                    ${optimal.stages.map(stage => createStageElement(stage, chapterIndex, enemiesInStage(stage)).outerHTML).join('')}
+                </div>
+            </div>`;
+        container.insertAdjacentHTML('beforeend', optimalHtml);
+    } else {
+        container.innerHTML = `<p>条件に一致するステージは見つかりませんでした。</p>`;
+    }
+
+    for (const [label, stages] of allCombinations.entries()) {
+        const combinationHtml = `
+            <div class="result-section collapsible">
+                <div class="result-header">${label}</div>
+                <div class="result-content" style="padding: 0;">
+                    ${stages.map(stage => createStageElement(stage, chapterIndex).outerHTML).join('')}
+                </div>
+            </div>`;
+        container.insertAdjacentHTML('beforeend', combinationHtml);
+    }
+    
+    // Add event listeners after rendering
+    container.querySelectorAll('.collapsible .result-header').forEach(header => header.onclick = () => header.parentElement.classList.toggle('open'));
+    container.querySelectorAll('.stage-list-item').forEach(item => item.addEventListener('click', toggleSurroundingStages));
+};
+
+const createStageElement = (stage, chapterIndex, enemiesFound = []) => {
+    const stageItem = document.createElement('div');
+    stageItem.className = 'stage-list-item';
+    stageItem.dataset.chapterIndex = chapterIndex;
+    stageItem.dataset.stageId = JSON.stringify(stage.id);
+
+    const stageNameHtml = chapterIndex < LEGEND_CHAPTER_INDEX 
+        ? `${stage.name}<sub>${stage.id}</sub>`
+        : `${stage.name[0]}<sub>${stage.id[0]}</sub> - ${stage.name[1]}<sub>${stage.id[1]}</sub>`;
+    
+    const enemiesHtml = enemiesFound.length > 0 ? `<div class="stage-enemies">${enemiesFound.map(e => `<span>${e}</span>`).join('')}</div>` : '';
+
+    stageItem.innerHTML = `
+        <div class="main-stage">
+            <div class="stage-info">
+                <div class="stage-name">${stageNameHtml}</div>
+                <div class="stage-stamina">統率力: ${stage.stamina}</div>
+            </div>
+            ${enemiesHtml}
+        </div>`;
+    return stageItem;
+};
+
+const toggleSurroundingStages = (event) => {
+    const stageItem = event.currentTarget;
+    const { chapterIndex, stageId } = stageItem.dataset;
+    const id = JSON.parse(stageId);
+
+    if (stageItem.classList.contains('expanded')) {
+        stageItem.classList.remove('expanded');
+        stageItem.querySelectorAll('.surrounding-stage').forEach(el => el.remove());
+        return;
+    }
+    
+    document.querySelectorAll('.stage-list-item.expanded').forEach(item => {
+        item.classList.remove('expanded');
+        item.querySelectorAll('.surrounding-stage').forEach(el => el.remove());
+    });
+    
+    stageItem.classList.add('expanded');
+    const beforeFragment = document.createDocumentFragment();
+    const afterFragment = document.createDocumentFragment();
+    const nameData = STAGE_NAME_DATA;
+
+    for (let i = -2; i <= 2; i++) {
+        if (i === 0) continue;
+        let surroundingName;
+        if (Array.isArray(id)) { // Legend stages
+            surroundingName = nameData[3][0][id[0] + i];
+        } else { // Other chapters
+            surroundingName = nameData[Math.floor(chapterIndex / 3)][id + i];
+        }
+        if (surroundingName) {
+            const el = document.createElement('div');
+            el.className = 'surrounding-stage';
+            el.innerHTML = `<span class="stage-name">${surroundingName}</span>`;
+            if (i < 0) {
+                beforeFragment.appendChild(el);
+            } else {
+                afterFragment.appendChild(el);
+            }
+        }
+    }
+    stageItem.insertBefore(beforeFragment, stageItem.querySelector('.main-stage'));
+    stageItem.appendChild(afterFragment);
+};
+</script>
+
+</body>
+</html>
